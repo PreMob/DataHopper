@@ -1,19 +1,34 @@
 # DataHopper 🔍
 
-A powerful multi-source research agent that aggregates and analyzes information from Google, Bing, and Reddit to provide comprehensive answers to your questions. Built with LangGraph, Google Gemini AI, and BrightData APIs.
+A powerful multi-source research agent that aggregates and analyzes information from Google, Bing, and Reddit to provide comprehensive answers to your questions. Built with FastAPI backend, Next.js frontend, LangGraph, Google Gemini AI, and BrightData APIs.
 
 ## 🌟 Features
 
 - **Multi-Source Research**: Simultaneously searches Google, Bing, and Reddit for comprehensive coverage
+- **Modern Web Interface**: Beautiful React frontend with real-time updates
 - **AI-Powered Analysis**: Uses Google Gemini AI to analyze and synthesize information from different sources
 - **Intelligent Reddit Mining**: Automatically selects and analyzes the most relevant Reddit posts and comments
+- **RESTful API**: FastAPI backend with comprehensive API documentation
 - **Structured Workflow**: Built with LangGraph for reliable, parallel processing
 - **Real-time Processing**: Live updates during the research process
 
 ## 🏗️ Architecture
 
-DataHopper uses a sophisticated graph-based workflow that processes research in parallel and synthesizes results:
+DataHopper consists of two main components:
 
+### Backend (FastAPI)
+- **Framework**: FastAPI with uvicorn
+- **AI Model**: Google Gemini 1.5 Flash
+- **Workflow Engine**: LangGraph for orchestrating search and analysis
+- **Search Sources**: Google, Bing (via SERP API), Reddit (API + post retrieval)
+
+### Frontend (Next.js)
+- **Framework**: Next.js 15 with React 19
+- **Styling**: Tailwind CSS + shadcn/ui components
+- **Animations**: Framer Motion for smooth interactions
+- **State Management**: React hooks for real-time updates
+
+### Workflow Architecture
 ```
 START
   ├── Google Search ──┐
@@ -39,8 +54,9 @@ START
 ### Prerequisites
 
 - Python 3.8+
+- Node.js 18+
 - Google Gemini API key
-- BrightData API key
+- BrightData API key (or other SERP API keys)
 
 ### Installation
 
@@ -50,36 +66,171 @@ START
    cd DataHopper
    ```
 
-2. **Set up virtual environment**
-   ```bash
-   python -m venv myenv
-   
-   # Windows
-   myenv\Scripts\activate
-   
-   # macOS/Linux
-   source myenv/bin/activate
-   ```
-
-3. **Install dependencies**
-   ```bash
-   pip install python-dotenv langgraph langchain typing-extensions pydantic requests google-generativeai langchain-google-genai
-   ```
-
-4. **Configure environment variables**
+2. **Set up environment variables**
    
    Create a `.env` file in the root directory:
    ```env
    GEMINI_API_KEY=your_gemini_api_key_here
-   BRIGHTDATA_API_KEY=your_brightdata_api_key_here
+   BRIGHTDATA_API_KEY=your_api_key_here
+   NEXT_PUBLIC_RESEARCH_API_URL=http://127.0.0.1:8000/api/research
+   # Add other API keys as needed
+   ```
+
+3. **Install Python dependencies**
+   ```bash
+   pip install -r requirements.txt
+   # Or manually install:
+   # pip install fastapi uvicorn python-dotenv langgraph google-generativeai pydantic
+   ```
+
+4. **Set up frontend**
+   ```bash
+   cd Frontend
+   npm install
+   cd ..
    ```
 
 5. **Run the application**
+   
+   **Option 1: Run both services together (Windows)**
    ```bash
-   python main.py
+   run_both.bat
+   # Or use the enhanced startup script:
+   start_datahopper.bat
+   ```
+   
+   **Option 2: Run separately**
+   
+   Terminal 1 - Backend:
+   ```bash
+   python main.py --api --port=8000
+   ```
+   
+   Terminal 2 - Frontend:
+   ```bash
+   cd Frontend
+   npm run dev
    ```
 
-## 🔧 Configuration
+6. **Access the application**
+   - **Frontend UI**: http://localhost:3000
+   - **Backend API**: http://127.0.0.1:8000
+   - **API Documentation**: http://127.0.0.1:8000/docs
+
+## 🔧 API Endpoints
+
+### Research Endpoint
+```bash
+POST /api/research
+Content-Type: application/json
+
+{
+  "question": "Your research question here"
+}
+```
+
+**Response:**
+```json
+{
+  "final_answer": "Synthesized answer from all sources",
+  "google_results": {...},
+  "bing_results": {...}, 
+  "reddit_results": {...},
+  "status": "completed"
+}
+```
+
+### Health Check
+```bash
+GET /api/health
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "message": "DataHopper API is running"
+}
+```
+
+## 📁 Project Structure
+
+```
+DataHopper/
+├── main.py                    # Backend FastAPI application & LangGraph workflow
+├── web_operations.py          # Search API integrations (Google, Bing, Reddit)
+├── prompts.py                 # AI prompt templates for analysis
+├── snapshot_operations.py     # BrightData snapshot processing utilities
+├── run_both.bat              # Windows startup script (separate windows)
+├── start_datahopper.bat      # Enhanced startup script (automated)
+├── .env                      # Environment variables (create this)
+├── Frontend/
+│   ├── .env.local            # Frontend environment config
+│   ├── app/
+│   │   ├── page.tsx          # Main application page
+│   │   ├── layout.tsx        # App layout
+│   │   ├── globals.css       # Global styles
+│   │   └── api/
+│   │       └── mock-research/ # Mock API for testing
+│   ├── components/
+│   │   ├── ui/               # shadcn/ui components
+│   │   ├── research-sources.tsx
+│   │   ├── animated-side-border.tsx
+│   │   └── ...               # Other UI components
+│   ├── lib/
+│   │   └── utils.ts          # Utility functions
+│   ├── hooks/                # Custom React hooks
+│   ├── public/               # Static assets
+│   ├── package.json          # Frontend dependencies
+│   └── next.config.mjs       # Next.js configuration
+└── __pycache__/              # Python cache files
+```
+
+## 🎯 Usage Examples
+
+### Web Interface
+1. Open http://localhost:3000 in your browser
+2. Enter your research question in the search box
+3. Click the search button or press Enter
+4. Watch as the system searches multiple sources in real-time
+5. View the comprehensive analysis with sources and citations
+
+### Command Line Interface
+```bash
+python main.py
+
+Ask me anything: What are the latest developments in AI?
+
+Starting parallel research process...
+Launching Google, Bing, and Reddit searches...
+
+[Research process with real-time updates]
+
+Final Answer: [Comprehensive analysis from all sources]
+```
+
+### API Usage
+```bash
+curl -X POST "http://127.0.0.1:8000/api/research" \
+     -H "Content-Type: application/json" \
+     -d '{"question": "What are the benefits of renewable energy?"}'
+```
+
+## 🛠️ Configuration
+
+### Environment Variables
+
+**Backend (.env)**:
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+SERP_API_KEY=your_serp_api_key_here
+BRIGHTDATA_API_KEY=your_brightdata_key_here
+```
+
+**Frontend (Frontend/.env.local)**:
+```env
+NEXT_PUBLIC_RESEARCH_API_URL=http://127.0.0.1:8000/api/research
+```
 
 ### API Keys Setup
 
@@ -88,139 +239,109 @@ START
 2. Create a new API key
 3. Add it to your `.env` file as `GEMINI_API_KEY`
 
-#### BrightData API
-1. Sign up at [BrightData](https://brightdata.com/)
-2. Get your API key from the dashboard
-3. Add it to your `.env` file as `BRIGHTDATA_API_KEY`
-
-### Model Configuration
-
-The system uses Google Gemini 1.5 Flash for AI analysis. You can modify the model in `main.py`:
-
-```python
-llm = init_chat_model(
-    "gemini-1.5-pro",  # Change model here
-    model_provider="google_genai", 
-    api_key=os.getenv("GEMINI_API_KEY")
-)
-```
-
-## 📁 Project Structure
-
-```
-DataHopper/
-├── main.py                 # Main application and workflow orchestration
-├── web_operations.py       # BrightData API integration for web scraping
-├── snapshot_operations.py  # Handles BrightData snapshot processing
-├── prompts.py             # AI prompt templates for different analysis types
-├── .env                   # Environment variables (create this)
-├── .gitignore            # Git ignore rules
-└── README.md             # This file
-```
+#### SERP API (for Google/Bing search)
+1. Sign up at your preferred SERP API provider
+2. Get your API key
+3. Add it to your `.env` file as `SERP_API_KEY`
 
 ## 🧩 Core Components
 
-### 1. **main.py** - Workflow Orchestration
-- Defines the LangGraph workflow
-- Manages state between different research phases
-- Coordinates parallel search operations
-- Handles user interaction
+### Backend Components
 
-### 2. **web_operations.py** - Data Collection
-- **SERP Search**: Google and Bing search via BrightData
-- **Reddit Search**: Keyword-based Reddit post discovery
-- **Reddit Retrieval**: Detailed post and comment extraction
+1. **main.py** - Main application orchestrating the research workflow
+   - FastAPI web server with CORS support
+   - LangGraph workflow definition
+   - State management between research phases
+   - API endpoints for frontend integration
 
-### 3. **snapshot_operations.py** - Data Processing
-- **Snapshot Polling**: Monitors BrightData job completion
-- **Data Download**: Retrieves processed research data
-- **Error Handling**: Manages API timeouts and failures
+2. **web_operations.py** - External API integrations
+   - SERP search for Google and Bing
+   - Reddit API search and post retrieval
+   - Data formatting and error handling
 
-### 4. **prompts.py** - AI Analysis Templates
-- **Structured Prompts**: Specialized prompts for different sources
-- **Analysis Types**: Google facts, Bing perspectives, Reddit community insights
-- **Synthesis Logic**: Combines multiple analyses into coherent answers
+3. **prompts.py** - AI analysis templates
+   - Specialized prompts for different sources
+   - Analysis types: Google facts, Bing perspectives, Reddit insights
+   - Synthesis logic for combining multiple analyses
 
-## 🎯 Usage Examples
+### Frontend Components
 
-### Basic Research Query
-```
-Ask me anything: invest in nvidia
+1. **page.tsx** - Main application interface
+   - Real-time search progress indicators
+   - Message-based chat interface
+   - Source display and citation
+   - Responsive design with animations
 
-Starting parallel research process...
-Launching Google, Bing, and Reddit searches...
-
-Searching Google for: invest in nvidia
-Searching Bing for: invest in nvidia  
-Searching Reddit for: invest in nvidia
-...
-Final Answer: [Comprehensive analysis from all sources]
-```
-
-### Research Process Flow
-1. **Parallel Search**: Simultaneously queries Google, Bing, and Reddit
-2. **Reddit Analysis**: AI selects most relevant Reddit discussions
-3. **Content Retrieval**: Downloads detailed Reddit post content
-4. **Source Analysis**: Separate AI analysis for each source type
-5. **Synthesis**: Combines insights into a final comprehensive answer
-
-## 🛠️ Advanced Configuration
-
-### Custom Search Parameters
-
-**Reddit Search Customization**:
-```python
-reddit_results = reddit_search_api(
-    keyword=user_question,
-    date="All time",        # Options: "All time", "Past year", etc.
-    sort_by="Hot",          # Options: "Hot", "New", "Top"
-    num_of_posts=75         # Number of posts to retrieve
-)
-```
-
-**Reddit Post Retrieval**:
-```python
-reddit_post_data = reddit_post_retrieval(
-    urls=selected_urls,
-    days_back=10,           # How far back to look for comments
-    load_all_replies=False, # Whether to load all comment threads
-    comment_limit=""        # Limit number of comments
-)
-```
-
-### BrightData Zones
-The system uses BrightData zones for different operations:
-- **SERP Search**: `ai_agent_1` zone
-- **Reddit Discovery**: `gd_lvz8ah06191smkebj4` dataset
-- **Reddit Retrieval**: `gd_lvzdpsdlw09j6t702` dataset
+2. **components/** - Reusable UI components
+   - Research sources display
+   - Chat bubbles and input
+   - Loading skeletons
+   - Theme provider for dark/light mode
 
 ## 🔍 How It Works
 
-### 1. **Multi-Source Data Collection**
-- **Google**: Authoritative sources, official information, statistics
+### Research Process Flow
+1. **User Input**: Question submitted via web interface or API
+2. **Parallel Search**: Simultaneously queries Google, Bing, and Reddit
+3. **Reddit Analysis**: AI selects most relevant Reddit discussions
+4. **Content Retrieval**: Downloads detailed Reddit post content
+5. **Source Analysis**: Separate AI analysis for each source type
+6. **Synthesis**: Combines insights into a final comprehensive answer
+7. **Response**: Returns structured results with sources
+
+### Multi-Source Analysis
+- **Google**: Authoritative sources, official information, recent news
 - **Bing**: Microsoft ecosystem perspectives, technical documentation
-- **Reddit**: Community experiences, real user opinions, discussions
+- **Reddit**: Community experiences, real user opinions, practical discussions
 
-### 2. **AI-Powered Analysis**
-Each source gets specialized analysis:
-- **Google Analysis**: Facts, official sources, verified information
-- **Bing Analysis**: Technical details, enterprise perspectives
-- **Reddit Analysis**: User experiences, community consensus, practical tips
-
-### 3. **Intelligent Synthesis**
+### AI-Powered Synthesis
 The final step combines all analyses to provide:
 - Balanced perspectives from multiple sources
-- Identification of common themes and contradictions
+- Identification of common themes and contradictions  
 - Source attribution for key claims
 - Comprehensive answer addressing the original question
+
+## 🚀 Development
+
+### Backend Development
+```bash
+# Run backend in development mode
+python main.py --api --port=8000
+
+# Access API documentation
+open http://127.0.0.1:8000/docs
+```
+
+### Frontend Development  
+```bash
+cd Frontend
+
+# Install dependencies
+npm install
+
+# Run development server with hot reload
+npm run dev
+
+# Build for production
+npm run build
+npm start
+```
+
+### Integration Testing
+1. Start both backend and frontend
+2. Test the research flow end-to-end
+3. Verify source data is properly displayed
+4. Check error handling and loading states
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+3. Make your changes
+4. Test both backend and frontend functionality
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
 
 ## 📄 License
 
@@ -237,11 +358,12 @@ If you encounter any issues or have questions:
 ## 🔮 Future Enhancements
 
 - [ ] Add more search engines (DuckDuckGo, Yahoo)
-- [ ] Support for image and video search
+- [ ] Real-time streaming responses
+- [ ] User authentication and saved searches
 - [ ] Export results to different formats (PDF, JSON)
-- [ ] Web interface for easier interaction
+- [ ] Advanced filtering and source preferences
 - [ ] Caching system for faster repeated queries
-- [ ] Custom source weighting and preferences
+- [ ] Mobile app development
 
 ---
 

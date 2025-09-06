@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from typing import Annotated, List
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
-from langchain.chat_models import init_chat_model
+import google.generativeai as genai
 from typing_extensions import TypedDict
 from pydantic import BaseModel, Field
 import os
@@ -14,11 +14,16 @@ from prompts import (
     get_reddit_url_analysis_messages,
     get_synthesis_messages
     )
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+from contextlib import asynccontextmanager
 
 load_dotenv()
 
 # Initialize Gemini model
-llm = init_chat_model("gemini-1.5-flash", model_provider="google_genai", api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+llm = genai.GenerativeModel('gemini-1.5-flash')
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
@@ -35,6 +40,32 @@ class State(TypedDict):
 
 class RedditURLAnalysis(BaseModel):
     selected_urls: List[str] = Field(description="List of Reddit URLs that contain valuable information for answering the user's question")
+
+# FastAPI app setup
+app = FastAPI(title="DataHopper API", description="Multi-source research agent API")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+# Request/Response models
+class ResearchRequest(BaseModel):
+    question: str = Field(..., description="The research question to answer")
+
+class ResearchResponse(BaseModel):
+    final_answer: str
+    google_results: dict = None
+    bing_results: dict = None
+    reddit_results: dict = None
+    status: str = "completed"
 
 def google_search(state:State):
     user_question = state.get("user_question", "")
@@ -70,19 +101,36 @@ def analyze_reddit_posts(state:State):
     if not reddit_results:
         return {"selected_reddit_urls": []}
     
-    structured_llm = llm.with_structured_output(RedditURLAnalysis)
-    messages = get_reddit_url_analysis_messages(user_question, reddit_results) #type:ignore
-
+    messages = get_reddit_url_analysis_messages(user_question, reddit_results)
+    system_prompt = messages[0]["content"]
+    user_prompt = messages[1]["content"]
+    
+    response = llm.generate_content(f"{system_prompt}\n\n{user_prompt}\n\nPlease respond with a JSON array of URLs like: [\"url1\", \"url2\"]")
+    
+    import json
+    import re
+    
     try:
-        analysis = structured_llm.invoke(messages)
-        selected_urls = analysis.selected_urls #type:ignore
-
+        # Try to extract URLs from the response
+        content = response.text.strip()
+        # Look for JSON array in the response
+        json_match = re.search(r'\[.*\]', content)
+        if json_match:
+            selected_urls = json.loads(json_match.group())
+        else:
+            # Fallback: extract URLs manually
+            selected_urls = []
+            if reddit_results and "parsed_posts" in reddit_results:
+                # Take first few posts as fallback
+                posts = reddit_results["parsed_posts"][:3]
+                selected_urls = [post.get("url") for post in posts if post.get("url")]
+        
         print("Selected URLs:")
         for i, url in enumerate(selected_urls, 1):
             print(f" {i}. {url}")
 
     except Exception as e:
-        print(e)
+        print(f"Error parsing URLs: {e}")
         selected_urls = []
 
     return {"selected_reddit_urls": selected_urls}
@@ -114,10 +162,12 @@ def analyze_google_results(state: State):
     user_question = state.get("user_question", "")
     google_results = state.get("google_results", "")
 
-    messages = get_google_analysis_messages(user_question, google_results) #type:ignore
-    reply = llm.invoke(messages)
-
-    return {"google_analysis": reply.content}
+    messages = get_google_analysis_messages(user_question, google_results)
+    system_prompt = messages[0]["content"]
+    user_prompt = messages[1]["content"]
+    
+    response = llm.generate_content(f"{system_prompt}\n\n{user_prompt}")
+    return {"google_analysis": response.text}
 
 
 def analyze_bing_results(state: State):
@@ -126,10 +176,12 @@ def analyze_bing_results(state: State):
     user_question = state.get("user_question", "")
     bing_results = state.get("bing_results", "")
 
-    messages = get_bing_analysis_messages(user_question, bing_results) #type:ignore
-    reply = llm.invoke(messages)
-
-    return {"bing_analysis": reply.content}
+    messages = get_bing_analysis_messages(user_question, bing_results)
+    system_prompt = messages[0]["content"]
+    user_prompt = messages[1]["content"]
+    
+    response = llm.generate_content(f"{system_prompt}\n\n{user_prompt}")
+    return {"bing_analysis": response.text}
 
 
 def analyze_reddit_results(state: State):
@@ -139,10 +191,12 @@ def analyze_reddit_results(state: State):
     reddit_results = state.get("reddit_results", "")
     reddit_post_data = state.get("reddit_post_data", "")
 
-    messages = get_reddit_analysis_messages(user_question, reddit_results, reddit_post_data) #type:ignore
-    reply = llm.invoke(messages)
-
-    return {"reddit_analysis": reply.content}
+    messages = get_reddit_analysis_messages(user_question, reddit_results, reddit_post_data)
+    system_prompt = messages[0]["content"]
+    user_prompt = messages[1]["content"]
+    
+    response = llm.generate_content(f"{system_prompt}\n\n{user_prompt}")
+    return {"reddit_analysis": response.text}
 
 
 def synthesize_analyses(state: State):
@@ -154,11 +208,13 @@ def synthesize_analyses(state: State):
     reddit_analysis = state.get("reddit_analysis", "")
 
     messages = get_synthesis_messages(
-        user_question, google_analysis, bing_analysis, reddit_analysis #type:ignore
+        user_question, google_analysis, bing_analysis, reddit_analysis
     )
-
-    reply = llm.invoke(messages)
-    final_answer = reply.content
+    system_prompt = messages[0]["content"]
+    user_prompt = messages[1]["content"]
+    
+    response = llm.generate_content(f"{system_prompt}\n\n{user_prompt}")
+    final_answer = response.text
 
     return {"final_answer": final_answer, "messages": [{"role": "assistant", "content": final_answer}]}
 
@@ -195,6 +251,43 @@ graph_builder.add_edge("synthesize_analyses", END )
 
 graph = graph_builder.compile()
 
+# API Endpoints
+@app.post("/api/research", response_model=ResearchResponse)
+async def research_endpoint(request: ResearchRequest):
+    """Perform multi-source research on a given question."""
+    try:
+        state = {
+            "messages":[{"role": "user", "content": request.question}],
+            "user_question": request.question,
+            "google_results": None,
+            "bing_results": None,
+            "reddit_results": None,
+            "google_analysis": None,
+            "bing_analysis": None,
+            "reddit_analysis": None,
+            "final_answer": None,
+        }
+
+        print(f"Starting research for: {request.question}")
+        final_state = graph.invoke(state)
+
+        return ResearchResponse(
+            final_answer=final_state.get("final_answer", "No answer generated"),
+            google_results=final_state.get("google_results"),
+            bing_results=final_state.get("bing_results"),
+            reddit_results=final_state.get("reddit_results"),
+            status="completed"
+        )
+
+    except Exception as e:
+        print(f"Error during research: {e}")
+        raise HTTPException(status_code=500, detail=f"Research failed: {str(e)}")
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "message": "DataHopper API is running"}
+
 def run_chatbot():
     print("Multi-Source Research Agent")
     print("Type 'exit' to quit\n")
@@ -227,4 +320,28 @@ def run_chatbot():
         print("-" * 80)
 
 if __name__ == "__main__":
-    run_chatbot()
+    import sys
+    
+    try:
+        if len(sys.argv) > 1 and sys.argv[1] == "--api":
+            # Run as API server
+            port = 8000
+            if len(sys.argv) > 2 and sys.argv[2].startswith("--port="):
+                try:
+                    port = int(sys.argv[2].split("=")[1])
+                except ValueError:
+                    print("Invalid port number, using default 8000")
+            
+            print(f"Starting DataHopper API server on port {port}...")
+            print("API endpoints:")
+            print(f"  - Health check: http://127.0.0.1:{port}/api/health")
+            print(f"  - Research: http://127.0.0.1:{port}/api/research")
+            print(f"  - API docs: http://127.0.0.1:{port}/docs")
+            uvicorn.run(app, host="127.0.0.1", port=port)
+        else:
+            # Run as CLI chatbot
+            run_chatbot()
+    except Exception as e:
+        print(f"Error starting server: {e}")
+        import traceback
+        traceback.print_exc()
