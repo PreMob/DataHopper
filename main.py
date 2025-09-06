@@ -85,7 +85,7 @@ def analyze_reddit_posts(state:State):
         print(e)
         selected_urls = []
 
-    return {"slected_reddit_urls": selected_urls}
+    return {"selected_reddit_urls": selected_urls}
 
 def retrieve_reddit_posts(state:State):
     print("Getting reddit post comments")
