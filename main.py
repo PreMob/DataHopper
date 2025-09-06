@@ -62,46 +62,67 @@ class ResearchRequest(BaseModel):
 
 class ResearchResponse(BaseModel):
     final_answer: str
-    google_results: dict = None
-    bing_results: dict = None
-    reddit_results: dict = None
+    google_results: dict | None = None
+    bing_results: dict | None = None
+    reddit_results: dict | None = None
     status: str = "completed"
 
 def google_search(state:State):
     user_question = state.get("user_question", "")
     print(f"Searching Google for: {user_question}")
 
-    google_resutls = serp_search(user_question, engine="google")
-    print(google_resutls)
+    google_results = serp_search(user_question, engine="google")
+    print(google_results)
 
-    return {"google_results": google_resutls}
+    # Ensure we return a dictionary structure
+    if isinstance(google_results, str):
+        google_results = {"raw_results": google_results}
+    elif google_results is None:
+        google_results = {"error": "No results found", "raw_results": ""}
+
+    return {"google_results": google_results}
 
 def bing_search(state:State):
     user_question = state.get("user_question", "")
     print(f"Searching Bing for: {user_question}")
 
-    bing_resutls = serp_search(user_question, engine="bing")
-    print(bing_resutls)
+    bing_results = serp_search(user_question, engine="bing")
+    print(bing_results)
 
-    return {"bing_results": bing_resutls}
+    # Ensure we return a dictionary structure
+    if isinstance(bing_results, str):
+        bing_results = {"raw_results": bing_results}
+    elif bing_results is None:
+        bing_results = {"error": "No results found", "raw_results": ""}
+
+    return {"bing_results": bing_results}
 
 def reddit_search(state:State):
     user_question = state.get("user_question", "")
     print(f"Searching Reddit for: {user_question}")
 
-    reddit_resutls = reddit_search_api(user_question)
-    print(reddit_resutls)
+    reddit_results = reddit_search_api(user_question)
+    print(reddit_results)
 
-    return {"reddit_results": reddit_resutls}
+    # Ensure we return a dictionary structure
+    if isinstance(reddit_results, str):
+        reddit_results = {"raw_results": reddit_results}
+    elif reddit_results is None:
+        reddit_results = {"error": "No results found", "raw_results": ""}
+
+    return {"reddit_results": reddit_results}
 
 def analyze_reddit_posts(state:State):
     user_question = state.get("user_question", "")
-    reddit_results = state.get("reddit_results", "")
+    reddit_results = state.get("reddit_results", {})
 
-    if not reddit_results:
+    if not reddit_results or (isinstance(reddit_results, dict) and reddit_results.get("error")):
         return {"selected_reddit_urls": []}
     
-    messages = get_reddit_url_analysis_messages(user_question, reddit_results)
+    # Convert reddit_results to string for analysis if it's a dict
+    reddit_results_str = str(reddit_results) if isinstance(reddit_results, dict) else reddit_results
+    
+    messages = get_reddit_url_analysis_messages(user_question or "", reddit_results_str or "")
     system_prompt = messages[0]["content"]
     user_prompt = messages[1]["content"]
     
@@ -120,10 +141,11 @@ def analyze_reddit_posts(state:State):
         else:
             # Fallback: extract URLs manually
             selected_urls = []
-            if reddit_results and "parsed_posts" in reddit_results:
+            if isinstance(reddit_results, dict) and "parsed_posts" in reddit_results:
                 # Take first few posts as fallback
-                posts = reddit_results["parsed_posts"][:3]
-                selected_urls = [post.get("url") for post in posts if post.get("url")]
+                posts = reddit_results["parsed_posts"]
+                if isinstance(posts, list):
+                    selected_urls = [post.get("url") for post in posts[:3] if isinstance(post, dict) and post.get("url")]
         
         print("Selected URLs:")
         for i, url in enumerate(selected_urls, 1):
@@ -160,9 +182,15 @@ def analyze_google_results(state: State):
     print("Analyzing google search results")
 
     user_question = state.get("user_question", "")
-    google_results = state.get("google_results", "")
+    google_results = state.get("google_results", {})
 
-    messages = get_google_analysis_messages(user_question, google_results)
+    # Convert to string for analysis if needed
+    if isinstance(google_results, dict):
+        google_results_str = google_results.get("raw_results", "") or str(google_results)
+    else:
+        google_results_str = google_results or ""
+
+    messages = get_google_analysis_messages(user_question or "", google_results_str)
     system_prompt = messages[0]["content"]
     user_prompt = messages[1]["content"]
     
@@ -174,9 +202,15 @@ def analyze_bing_results(state: State):
     print("Analyzing bing search results")
 
     user_question = state.get("user_question", "")
-    bing_results = state.get("bing_results", "")
+    bing_results = state.get("bing_results", {})
 
-    messages = get_bing_analysis_messages(user_question, bing_results)
+    # Convert to string for analysis if needed
+    if isinstance(bing_results, dict):
+        bing_results_str = bing_results.get("raw_results", "") or str(bing_results)
+    else:
+        bing_results_str = bing_results or ""
+
+    messages = get_bing_analysis_messages(user_question or "", bing_results_str)
     system_prompt = messages[0]["content"]
     user_prompt = messages[1]["content"]
     
@@ -188,10 +222,20 @@ def analyze_reddit_results(state: State):
     print("Analyzing reddit search results")
 
     user_question = state.get("user_question", "")
-    reddit_results = state.get("reddit_results", "")
-    reddit_post_data = state.get("reddit_post_data", "")
+    reddit_results = state.get("reddit_results", {})
+    reddit_post_data = state.get("reddit_post_data", [])
 
-    messages = get_reddit_analysis_messages(user_question, reddit_results, reddit_post_data)
+    # Convert to string for analysis if needed
+    if isinstance(reddit_results, dict):
+        reddit_results_str = reddit_results.get("raw_results", "") or str(reddit_results)
+    else:
+        reddit_results_str = reddit_results or ""
+
+    messages = get_reddit_analysis_messages(
+        user_question or "", 
+        reddit_results_str, 
+        reddit_post_data or []
+    )
     system_prompt = messages[0]["content"]
     user_prompt = messages[1]["content"]
     
@@ -208,7 +252,10 @@ def synthesize_analyses(state: State):
     reddit_analysis = state.get("reddit_analysis", "")
 
     messages = get_synthesis_messages(
-        user_question, google_analysis, bing_analysis, reddit_analysis
+        user_question or "",
+        google_analysis or "",
+        bing_analysis or "",
+        reddit_analysis or ""
     )
     system_prompt = messages[0]["content"]
     user_prompt = messages[1]["content"]
@@ -256,12 +303,14 @@ graph = graph_builder.compile()
 async def research_endpoint(request: ResearchRequest):
     """Perform multi-source research on a given question."""
     try:
-        state = {
+        state: State = {
             "messages":[{"role": "user", "content": request.question}],
             "user_question": request.question,
             "google_results": None,
             "bing_results": None,
             "reddit_results": None,
+            "selected_reddit_urls": None,
+            "reddit_post_data": None,
             "google_analysis": None,
             "bing_analysis": None,
             "reddit_analysis": None,
@@ -298,12 +347,14 @@ def run_chatbot():
             print("Bye")
             break
 
-        state = {
+        state: State = {
             "messages":[{"role": "user", "content":user_input}],
             "user_question": user_input,
             "google_results": None,
             "bing_results": None,
             "reddit_results": None,
+            "selected_reddit_urls": None,
+            "reddit_post_data": None,
             "google_analysis": None,
             "bing_analysis": None,
             "reddit_analysis": None,
