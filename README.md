@@ -78,15 +78,22 @@ START
 
 3. **Install Python dependencies**
    ```bash
-   pip install -r requirements.txt
-   # Or manually install:
-   # pip install fastapi uvicorn python-dotenv langgraph google-generativeai pydantic
+   # Create virtual environment (recommended)
+   python -m venv myenv
+   myenv\Scripts\activate  # Windows
+   # source myenv/bin/activate  # macOS/Linux
+   
+   # Install dependencies
+   pip install fastapi uvicorn python-dotenv langgraph google-generativeai pydantic requests
+   
+   # Or if you have requirements.txt:
+   # pip install -r requirements.txt
    ```
 
 4. **Set up frontend**
    ```bash
    cd Frontend
-   npm install
+   pnpm install  # or npm install
    cd ..
    ```
 
@@ -109,7 +116,7 @@ START
    Terminal 2 - Frontend:
    ```bash
    cd Frontend
-   npm run dev
+   pnpm dev  # or npm run dev
    ```
 
 6. **Access the application**
@@ -153,6 +160,68 @@ GET /api/health
 }
 ```
 
+## 🚨 Troubleshooting
+
+### Common Issues and Solutions
+
+#### Backend Issues
+
+**1. Module not found errors**
+```bash
+# Ensure virtual environment is activated
+myenv\Scripts\activate  # Windows
+# source myenv/bin/activate  # macOS/Linux
+
+# Install missing packages
+pip install fastapi uvicorn python-dotenv langgraph google-generativeai pydantic requests
+```
+
+**2. BrightData API 400 errors**
+- Verify your `BRIGHTDATA_API_KEY` in `.env` file
+- Check API key permissions and usage limits
+- Ensure proper request format (fixed in recent updates)
+
+**3. Gemini API errors**
+- Verify your `GEMINI_API_KEY` in `.env` file
+- Check API quota and billing status
+- Ensure API key has proper permissions
+
+#### Frontend Issues
+
+**4. Module resolution errors (`@/lib/utils`)**
+```bash
+cd Frontend
+pnpm add clsx tailwind-merge  # or npm install clsx tailwind-merge
+```
+
+**5. Missing API URL error**
+- Create `Frontend/.env.local` with:
+```env
+NEXT_PUBLIC_RESEARCH_API_URL=http://127.0.0.1:8000/api/research
+```
+
+**6. CORS errors**
+- Ensure backend is running on port 8000
+- Check frontend is running on port 3000
+- Verify CORS origins in main.py
+
+#### Runtime Issues
+
+**7. Redis data type errors**
+- This has been fixed in recent updates
+- Ensure you're using the latest code version
+- Check that all search functions return proper data structures
+
+**8. LangGraph workflow errors**
+- Ensure all required environment variables are set
+- Check that all imported modules are properly installed
+- Verify state management between workflow nodes
+{
+  "status": "healthy",
+  "message": "DataHopper API is running"
+}
+```
+
 ## 📁 Project Structure
 
 ```
@@ -161,19 +230,26 @@ DataHopper/
 ├── web_operations.py          # Search API integrations (Google, Bing, Reddit)
 ├── prompts.py                 # AI prompt templates for analysis
 ├── snapshot_operations.py     # BrightData snapshot processing utilities
-├── run_both.bat              # Windows startup script (separate windows)
-├── start_datahopper.bat      # Enhanced startup script (automated)
 ├── .env                      # Environment variables (create this)
+├── myenv/                    # Python virtual environment
+│   ├── Scripts/              # Activation scripts and executables
+│   └── Lib/                  # Installed packages
 ├── Frontend/
-│   ├── .env.local            # Frontend environment config
+│   ├── .env                  # Frontend environment config
+│   ├── package.json          # Frontend dependencies (pnpm)
+│   ├── pnpm-lock.yaml        # pnpm lockfile
+│   ├── components.json       # shadcn/ui configuration
+│   ├── next.config.mjs       # Next.js configuration
+│   ├── tsconfig.json         # TypeScript configuration
 │   ├── app/
 │   │   ├── page.tsx          # Main application page
 │   │   ├── layout.tsx        # App layout
 │   │   ├── globals.css       # Global styles
 │   │   └── api/
-│   │       └── mock-research/ # Mock API for testing
+│   │       └── research/     # API route handlers
 │   ├── components/
 │   │   ├── ui/               # shadcn/ui components
+│   │   ├── chat ui/          # Chat interface components
 │   │   ├── research-sources.tsx
 │   │   ├── animated-side-border.tsx
 │   │   └── ...               # Other UI components
@@ -181,8 +257,7 @@ DataHopper/
 │   │   └── utils.ts          # Utility functions
 │   ├── hooks/                # Custom React hooks
 │   ├── public/               # Static assets
-│   ├── package.json          # Frontend dependencies
-│   └── next.config.mjs       # Next.js configuration
+│   └── styles/               # Additional stylesheets
 └── __pycache__/              # Python cache files
 ```
 
@@ -223,8 +298,9 @@ curl -X POST "http://127.0.0.1:8000/api/research" \
 **Backend (.env)**:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
-SERP_API_KEY=your_serp_api_key_here
 BRIGHTDATA_API_KEY=your_brightdata_key_here
+# Optional: Add other SERP API keys if using alternatives
+SERP_API_KEY=your_serp_api_key_here
 ```
 
 **Frontend (Frontend/.env.local)**:
@@ -317,14 +393,33 @@ open http://127.0.0.1:8000/docs
 cd Frontend
 
 # Install dependencies
-npm install
+pnpm install  # or npm install
 
 # Run development server with hot reload
-npm run dev
+pnpm dev  # or npm run dev
 
 # Build for production
-npm run build
-npm start
+pnpm build  # or npm run build
+pnpm start  # or npm start
+```
+
+### Creating requirements.txt
+If you don't have a requirements.txt file, create one with:
+```bash
+# In the root directory
+pip freeze > requirements.txt
+```
+
+Or create it manually with the core dependencies:
+```txt
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-dotenv==1.0.0
+google-generativeai==0.3.2
+langgraph==0.0.55
+pydantic==2.5.0
+requests==2.31.0
+typing-extensions==4.8.0
 ```
 
 ### Integration Testing
@@ -364,6 +459,8 @@ If you encounter any issues or have questions:
 - [ ] Advanced filtering and source preferences
 - [ ] Caching system for faster repeated queries
 - [ ] Mobile app development
+- [ ] Rate limiting and API usage monitoring
+- [ ] Improved error recovery mechanisms
 
 ---
 
